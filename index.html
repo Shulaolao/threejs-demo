@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/node_modules/three/build/three.module.min.js",
+                "three/addons/": "/node_modules/three/examples/jsm/",
+                "simplex-noise": "/node_modules/simplex-noise/dist/esm/simplex-noise.js"
+            }
+        }
+    </script>
+    <!-- <script type="module" src="./first/index.js"></script> -->
+    <!-- <script type="module" src="./basketballMesh/index.js"></script> -->
+    <!-- <script type="module" src="./mountain/index.js"></script> -->
+    <script type="module" src="/src/index.js"></script>
+    <!-- <script type="module" src="./solar-system/index.js"></script> -->
+</body>
+
+</html>

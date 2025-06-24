@@ -1,0 +1,971 @@
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000000;
+        color: white;
+        font-family: 'Courier New', monospace;
+    }
+
+    canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+    }
+
+    #ui {
+        position: absolute;
+        top: 15px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+        pointer-events: none;
+    }
+
+    #info {
+        font-size: 14px;
+        padding: 10px 18px;
+        background-color: rgba(25, 30, 50, 0.35);
+        border-radius: 10px;
+        display: inline-block;
+        text-shadow: 0 0 5px rgba(0, 128, 255, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+        box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.05);
+    }
+
+    #loading {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        transition: opacity 0.6s ease-out;
+    }
+
+    #loading span {
+        font-size: 24px;
+        letter-spacing: 2px;
+        margin-bottom: 15px;
+    }
+
+    #progress-container {
+        width: 60%;
+        max-width: 300px;
+        height: 6px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    #progress {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #00a2ff, #00ffea);
+        transition: width 0.3s ease;
+        border-radius: 3px;
+    }
+
+    #controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 100;
+        text-align: center;
+        pointer-events: all;
+        background-color: rgba(25, 30, 50, 0.4);
+        padding: 15px 25px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    button {
+        background: rgba(0, 80, 180, 0.7);
+        color: white;
+        border: 1px solid rgba(0, 180, 255, 0.6);
+        border-radius: 6px;
+        padding: 8px 15px;
+        margin: 0 8px;
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        transition: all 0.25s ease;
+    }
+
+    button:hover {
+        background: rgba(0, 110, 220, 0.9);
+        border-color: rgba(0, 210, 255, 0.9);
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0, 150, 255, 0.3);
+    }
+
+    #color-picker {
+        margin-top: 15px;
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    .color-option {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.4);
+    }
+
+    .color-option:hover {
+        transform: scale(1.15);
+        border-color: rgba(255, 255, 255, 0.7);
+    }
+
+    .color-option.active {
+        transform: scale(1.18);
+        border-color: white;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+    }
+</style>
+
+<div id="loading">
+    <span>Initializing Particles...</span>
+    <div id="progress-container">
+        <div id="progress"></div>
+    </div>
+</div>
+
+<div id="ui">
+    <div id="info">Shape: Sphere (Click to morph)</div>
+</div>
+
+<div id="controls">
+    <button id="shape-btn">Change Shape</button>
+
+    <div id="color-picker">
+        <div class="color-option" data-scheme="fire"
+            style="background: linear-gradient(to bottom right, #ff4500, #ffcc00)"></div>
+        <div class="color-option" data-scheme="neon"
+            style="background: linear-gradient(to bottom right, #ff00ff, #00ffff)"></div>
+        <div class="color-option" data-scheme="nature"
+            style="background: linear-gradient(to bottom right, #00ff00, #66ffcc)"></div>
+        <div class="color-option" data-scheme="rainbow"
+            style="background: linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)"></div>
+    </div>
+</div>
+
+<canvas id="webglCanvas"></canvas>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/",
+      "animejs": "https://cdn.jsdelivr.net/npm/animejs@3.2.2/lib/anime.es.js",
+      "simplex-noise": "https://cdn.skypack.dev/simplex-noise@4.0.1"
+    }
+  }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';  // 导入Three.js主库
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';  // 导入轨道控制器
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';  // 导入后期处理合成器
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';  // 导入渲染通道
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';  // 导入泛光效果通道
+    import anime from 'animejs';  // 导入动画库
+    import { createNoise3D, createNoise4D } from 'simplex-noise';  // 导入噪声生成器
+
+    // 全局变量声明
+    let scene, camera, renderer, controls, clock;  // 场景、相机、渲染器、控制器和时钟
+    let composer, bloomPass;  // 后期处理合成器和泛光效果
+
+    let particlesGeometry, particlesMaterial, particleSystem;  // 粒子几何体、材质和系统
+    let currentPositions, sourcePositions, targetPositions, swarmPositions;  // 粒子位置数组
+    let particleSizes, particleOpacities, particleEffectStrengths;  // 粒子属性数组
+    let noise3D, noise4D;  // 3D和4D噪声生成器
+
+    let morphTimeline = null;  // 变形动画时间线
+    let isInitialized = false;  // 初始化状态标志
+    let isMorphing = false;  // 变形状态标志
+
+    // 配置对象
+    const CONFIG = {
+        particleCount: 20000,  // 粒子数量
+        shapeSize: 14,  // 形状大小
+        swarmDistanceFactor: 1.5,  // 群集距离因子
+        swirlFactor: 4.0,  // 旋转因子
+        noiseFrequency: 0.1,  // 噪声频率
+        noiseTimeScale: 0.04,  // 噪声时间缩放
+        noiseMaxStrength: 2.8,  // 最大噪声强度
+        colorScheme: 'fire',  // 默认颜色方案
+        morphDuration: 4000,  // 变形持续时间
+        particleSizeRange: [0.08, 0.25],  // 粒子大小范围
+        starCount: 18000,  // 星星数量
+        bloomStrength: 1.3,  // 泛光强度
+        bloomRadius: 0.5,  // 泛光半径
+        bloomThreshold: 0.05,  // 泛光阈值
+        idleFlowStrength: 0.25,  // 空闲流动强度
+        idleFlowSpeed: 0.08,  // 空闲流动速度
+        idleRotationSpeed: 0.02,  // 空闲旋转速度
+        morphSizeFactor: 0.5,  // 变形大小因子
+        morphBrightnessFactor: 0.6  // 变形亮度因子
+    };
+
+    // 形状定义数组
+    const SHAPES = [
+        { name: 'Sphere', generator: generateSphere },  // 球体
+        { name: 'Cube', generator: generateCube },  // 立方体
+        { name: 'Pyramid', generator: generatePyramid },  // 金字塔
+        { name: 'Torus', generator: generateTorus },  // 圆环
+        { name: 'Galaxy', generator: generateGalaxy },  // 星系
+        { name: 'Wave', generator: generateWave }  // 波浪
+    ];
+    let currentShapeIndex = 0;  // 当前形状索引
+
+    const morphState = { progress: 0.0 };  // 变形状态对象
+
+    // 颜色方案定义
+    const COLOR_SCHEMES = {
+        fire: { startHue: 0, endHue: 45, saturation: 0.95, lightness: 0.6 },  // 火焰色系
+        neon: { startHue: 300, endHue: 180, saturation: 1.0, lightness: 0.65 },  // 霓虹色系
+        nature: { startHue: 90, endHue: 160, saturation: 0.85, lightness: 0.55 },  // 自然色系
+        rainbow: { startHue: 0, endHue: 360, saturation: 0.9, lightness: 0.6 }  // 彩虹色系
+    };
+
+    // 临时向量对象，用于计算
+    const tempVec = new THREE.Vector3();
+    const sourceVec = new THREE.Vector3();
+    const targetVec = new THREE.Vector3();
+    const swarmVec = new THREE.Vector3();
+    const noiseOffset = new THREE.Vector3();
+    const flowVec = new THREE.Vector3();
+    const bezPos = new THREE.Vector3();
+    const swirlAxis = new THREE.Vector3();
+    const currentVec = new THREE.Vector3();
+
+    // 生成球体形状的粒子位置
+    function generateSphere(count, size) {
+        const points = new Float32Array(count * 3);  // 创建存储点位置的数组
+        const phi = Math.PI * (Math.sqrt(5) - 1);  // 黄金角
+        for (let i = 0; i < count; i++) {
+            const y = 1 - (i / (count - 1)) * 2;  // 计算y坐标
+            const radius = Math.sqrt(1 - y * y);  // 计算半径
+            const theta = phi * i;  // 计算角度
+            const x = Math.cos(theta) * radius;  // 计算x坐标
+            const z = Math.sin(theta) * radius;  // 计算z坐标
+            points[i * 3] = x * size;  // 设置x坐标
+            points[i * 3 + 1] = y * size;  // 设置y坐标
+            points[i * 3 + 2] = z * size;  // 设置z坐标
+        }
+        return points;
+    }
+
+    // 生成立方体形状的粒子位置
+    function generateCube(count, size) {
+        const points = new Float32Array(count * 3);  // 创建存储点位置的数组
+        const halfSize = size / 2;  // 计算半边长
+        for (let i = 0; i < count; i++) {
+            const face = Math.floor(Math.random() * 6);  // 随机选择一个面
+            const u = Math.random() * size - halfSize;  // 随机u坐标
+            const v = Math.random() * size - halfSize;  // 随机v坐标
+            switch (face) {
+                case 0: points.set([halfSize, u, v], i * 3); break;  // 前面
+                case 1: points.set([-halfSize, u, v], i * 3); break;  // 后面
+                case 2: points.set([u, halfSize, v], i * 3); break;  // 上面
+                case 3: points.set([u, -halfSize, v], i * 3); break;  // 下面
+                case 4: points.set([u, v, halfSize], i * 3); break;  // 右面
+                case 5: points.set([u, v, -halfSize], i * 3); break;  // 左面
+            }
+        }
+        return points;
+    }
+
+    // 生成金字塔形状的粒子位置
+    function generatePyramid(count, size) {
+        const points = new Float32Array(count * 3);  // 创建存储点位置的数组
+        const halfBase = size / 2;  // 计算底面半边长
+        const height = size * 1.2;  // 计算高度
+        const apex = new THREE.Vector3(0, height / 2, 0);  // 顶点位置
+        const baseVertices = [  // 底面四个顶点
+            new THREE.Vector3(-halfBase, -height / 2, -halfBase),
+            new THREE.Vector3(halfBase, -height / 2, -halfBase),
+            new THREE.Vector3(halfBase, -height / 2, halfBase),
+            new THREE.Vector3(-halfBase, -height / 2, halfBase)
+        ];
+        const baseArea = size * size;  // 底面面积
+        const sideFaceHeight = Math.sqrt(Math.pow(height, 2) + Math.pow(halfBase, 2));  // 侧面高度
+        const sideFaceArea = 0.5 * size * sideFaceHeight;  // 侧面面积
+        const totalArea = baseArea + 4 * sideFaceArea;  // 总面积
+        const baseWeight = baseArea / totalArea;  // 底面权重
+        const sideWeight = sideFaceArea / totalArea;  // 侧面权重
+
+        for (let i = 0; i < count; i++) {
+            const r = Math.random();  // 随机数
+            let p = new THREE.Vector3();  // 临时向量
+            let u, v;
+            if (r < baseWeight) {  // 在底面上生成点
+                u = Math.random(); v = Math.random();
+                p.lerpVectors(baseVertices[0], baseVertices[1], u);
+                const p2 = new THREE.Vector3().lerpVectors(baseVertices[3], baseVertices[2], u);
+                p.lerp(p2, v);
+            } else {  // 在侧面上生成点
+                const faceIndex = Math.floor((r - baseWeight) / sideWeight);
+                const v1 = baseVertices[faceIndex];
+                const v2 = baseVertices[(faceIndex + 1) % 4];
+                u = Math.random(); v = Math.random();
+                if (u + v > 1) { u = 1 - u; v = 1 - v; }
+                p.addVectors(v1, tempVec.subVectors(v2, v1).multiplyScalar(u));
+                p.add(tempVec.subVectors(apex, v1).multiplyScalar(v));
+            }
+            points.set([p.x, p.y, p.z], i * 3);  // 设置点位置
+        }
+        return points;
+    }
+
+    // 生成圆环形状的粒子位置
+    function generateTorus(count, size) {
+        const points = new Float32Array(count * 3);  // 创建存储点位置的数组
+        const R = size * 0.7;  // 主半径
+        const r = size * 0.3;  // 截面半径
+        for (let i = 0; i < count; i++) {
+            const theta = Math.random() * Math.PI * 2;  // 随机角度
+            const phi = Math.random() * Math.PI * 2;  // 随机截面角度
+            const x = (R + r * Math.cos(phi)) * Math.cos(theta);  // 计算x坐标
+            const y = r * Math.sin(phi);  // 计算y坐标
+            const z = (R + r * Math.cos(phi)) * Math.sin(theta);  // 计算z坐标
+            points[i * 3] = x;  // 设置x坐标
+            points[i * 3 + 1] = y;  // 设置y坐标
+            points[i * 3 + 2] = z;  // 设置z坐标
+        }
+        return points;
+    }
+
+    // 生成星系形状的粒子位置
+    function generateGalaxy(count, size) {
+        const points = new Float32Array(count * 3);  // 创建存储点位置的数组
+        const arms = 4;  // 旋臂数量
+        const armWidth = 0.6;  // 旋臂宽度
+        const bulgeFactor = 0.3;  // 中心隆起因子
+        for (let i = 0; i < count; i++) {
+            const t = Math.pow(Math.random(), 1.5);  // 随机分布因子
+            const radius = t * size;  // 计算半径
+            const armIndex = Math.floor(Math.random() * arms);  // 随机选择旋臂
+            const armOffset = (armIndex / arms) * Math.PI * 2;  // 计算旋臂偏移
+            const rotationAmount = radius / size * 6;  // 计算旋转量
+            const angle = armOffset + rotationAmount;  // 计算角度
+            const spread = (Math.random() - 0.5) * armWidth * (1 - radius / size);  // 计算扩散
+            const theta = angle + spread;  // 最终角度
+            const x = radius * Math.cos(theta);  // 计算x坐标
+            const z = radius * Math.sin(theta);  // 计算z坐标
+            const y = (Math.random() - 0.5) * size * 0.1 * (1 - radius / size * bulgeFactor);  // 计算y坐标
+            points[i * 3] = x;  // 设置x坐标
+            points[i * 3 + 1] = y;  // 设置y坐标
+            points[i * 3 + 2] = z;  // 设置z坐标
+        }
+        return points;
+    }
+
+    // 生成波浪形状的粒子位置
+    function generateWave(count, size) {
+        const points = new Float32Array(count * 3);  // 创建存储点位置的数组
+        const waveScale = size * 0.4;  // 波浪缩放
+        const frequency = 3;  // 波浪频率
+        for (let i = 0; i < count; i++) {
+            const u = Math.random() * 2 - 1;  // 随机u坐标
+            const v = Math.random() * 2 - 1;  // 随机v坐标
+            const x = u * size;  // 计算x坐标
+            const z = v * size;  // 计算z坐标
+            const dist = Math.sqrt(u * u + v * v);  // 计算到中心的距离
+            const angle = Math.atan2(v, u);  // 计算角度
+            const y = Math.sin(dist * Math.PI * frequency) * Math.cos(angle * 2) * waveScale * (1 - dist);  // 计算y坐标
+            points[i * 3] = x;  // 设置x坐标
+            points[i * 3 + 1] = y;  // 设置y坐标
+            points[i * 3 + 2] = z;  // 设置z坐标
+        }
+        return points;
+    }
+
+    // 初始化函数
+    function init() {
+        let progress = 0;  // 进度计数器
+        const progressBar = document.getElementById('progress');  // 获取进度条元素
+        const loadingScreen = document.getElementById('loading');  // 获取加载屏幕元素
+
+        // 更新进度条的函数
+        function updateProgress(increment) {
+            progress += increment;  // 增加进度
+            progressBar.style.width = `${Math.min(100, progress)}%`;  // 更新进度条宽度
+            if (progress >= 100) {  // 如果进度达到100%
+                setTimeout(() => {
+                    loadingScreen.style.opacity = '0';  // 淡出加载屏幕
+                    setTimeout(() => { loadingScreen.style.display = 'none'; }, 600);  // 隐藏加载屏幕
+                }, 200);
+            }
+        }
+
+        clock = new THREE.Clock();  // 创建时钟对象
+        noise3D = createNoise3D(() => Math.random());  // 创建3D噪声生成器
+        noise4D = createNoise4D(() => Math.random());  // 创建4D噪声生成器
+        scene = new THREE.Scene();  // 创建场景
+        scene.fog = new THREE.FogExp2(0x000308, 0.03);  // 添加雾效果
+        updateProgress(5);  // 更新进度
+
+        // 设置相机
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 28);  // 设置相机位置
+        camera.lookAt(scene.position);  // 相机看向场景中心
+        updateProgress(5);  // 更新进度
+
+        // 设置渲染器
+        const canvas = document.getElementById('webglCanvas');
+        renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true,  // 抗锯齿
+            alpha: true,  // 透明背景
+            powerPreference: 'high-performance'  // 高性能模式
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);  // 设置渲染器大小
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));  // 设置像素比
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;  // 设置色调映射
+        renderer.toneMappingExposure = 1.1;  // 设置曝光度
+        updateProgress(10);  // 更新进度
+
+        // 设置控制器
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;  // 启用阻尼
+        controls.dampingFactor = 0.05;  // 设置阻尼因子
+        controls.minDistance = 5;  // 最小缩放距离
+        controls.maxDistance = 80;  // 最大缩放距离
+        controls.autoRotate = true;  // 自动旋转
+        controls.autoRotateSpeed = 0.3;  // 自动旋转速度
+        updateProgress(5);  // 更新进度
+
+        // 添加光源
+        scene.add(new THREE.AmbientLight(0x404060));  // 环境光
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.5);  // 主方向光
+        dirLight1.position.set(15, 20, 10);
+        scene.add(dirLight1);
+        const dirLight2 = new THREE.DirectionalLight(0x88aaff, 0.9);  // 辅助方向光
+        dirLight2.position.set(-15, -10, -15);
+        scene.add(dirLight2);
+        updateProgress(10);  // 更新进度
+        setupPostProcessing();  // 设置后期处理
+        updateProgress(10);  // 更新进度
+        createStarfield();  // 创建星空背景
+        updateProgress(15);  // 更新进度
+        setupParticleSystem();  // 设置粒子系统
+        updateProgress(25);  // 更新进度
+
+        // 添加事件监听器
+        window.addEventListener('resize', onWindowResize);  // 窗口大小改变事件
+        window.addEventListener('dblclick', onCanvasClick);  // 双击事件
+        document.getElementById('shape-btn').addEventListener('click', triggerMorph);  // 形状切换按钮点击事件
+        document.querySelectorAll('.color-option').forEach(option => {  // 颜色选项点击事件
+            option.addEventListener('click', (e) => {
+                document.querySelectorAll('.color-option').forEach(o => o.classList.remove('active'));
+                e.target.classList.add('active');
+                CONFIG.colorScheme = e.target.dataset.scheme;
+                updateColors();
+            });
+        });
+        document.querySelector(`.color-option[data-scheme="${CONFIG.colorScheme}"]`).classList.add('active');
+        updateProgress(15);  // 更新进度
+
+        isInitialized = true;  // 设置初始化完成标志
+        animate();  // 开始动画循环
+        console.log("Initialization complete.");  // 输出初始化完成信息
+    }
+
+    // 设置后期处理效果
+    function setupPostProcessing() {
+        composer = new EffectComposer(renderer);  // 创建后期处理合成器
+        composer.addPass(new RenderPass(scene, camera));  // 添加渲染通道
+        bloomPass = new UnrealBloomPass(  // 创建泛光效果通道
+            new THREE.Vector2(window.innerWidth, window.innerHeight),  // 分辨率
+            CONFIG.bloomStrength,  // 泛光强度
+            CONFIG.bloomRadius,  // 泛光半径
+            CONFIG.bloomThreshold  // 泛光阈值
+        );
+        composer.addPass(bloomPass);  // 添加泛光通道
+    }
+
+    // 创建星空背景
+    function createStarfield() {
+        const starVertices = [];  // 星星顶点数组
+        const starSizes = [];  // 星星大小数组
+        const starColors = [];  // 星星颜色数组
+        const starGeometry = new THREE.BufferGeometry();  // 创建星星几何体
+
+        // 生成星星
+        for (let i = 0; i < CONFIG.starCount; i++) {
+            // 随机生成星星位置
+            tempVec.set(
+                THREE.MathUtils.randFloatSpread(400),
+                THREE.MathUtils.randFloatSpread(400),
+                THREE.MathUtils.randFloatSpread(400)
+            );
+            // 确保星星在合适的位置
+            if (tempVec.length() < 100) tempVec.setLength(100 + Math.random() * 300);
+            starVertices.push(tempVec.x, tempVec.y, tempVec.z);
+            starSizes.push(Math.random() * 0.15 + 0.05);  // 随机星星大小
+
+            // 设置星星颜色
+            const color = new THREE.Color();
+            if (Math.random() < 0.1) {  // 10%的概率生成彩色星星
+                color.setHSL(Math.random(), 0.7, 0.65);
+            } else {  // 90%的概率生成白色星星
+                color.setHSL(0.6, Math.random() * 0.1, 0.8 + Math.random() * 0.2);
+            }
+            starColors.push(color.r, color.g, color.b);
+        }
+
+        // 设置几何体属性
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+        starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(starSizes, 1));
+
+        // 创建星星材质
+        const starMaterial = new THREE.ShaderMaterial({
+            uniforms: { pointTexture: { value: createStarTexture() } },  // 星星纹理
+            vertexShader: `
+                attribute float size;  // 星星大小属性
+                varying vec3 vColor;  // 传递到片元着色器的颜色
+                varying float vSize;  // 传递到片元着色器的大小
+                void main() {
+                    vColor = color;  // 传递颜色
+                    vSize = size;  // 传递大小
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);  // 计算模型视图位置
+                    gl_PointSize = size * (400.0 / -mvPosition.z);  // 设置点大小
+                    gl_Position = projectionMatrix * mvPosition;  // 设置最终位置
+                }`,
+            fragmentShader: `
+                uniform sampler2D pointTexture;  // 星星纹理
+                varying vec3 vColor;  // 从顶点着色器接收的颜色
+                varying float vSize;  // 从顶点着色器接收的大小
+                void main() {
+                    float alpha = texture2D(pointTexture, gl_PointCoord).a;  // 获取纹理透明度
+                    if (alpha < 0.1) discard;  // 如果太透明则丢弃
+                    gl_FragColor = vec4(vColor, alpha * 0.9);  // 设置最终颜色
+                }`,
+            blending: THREE.AdditiveBlending,  // 使用加法混合
+            depthWrite: false,  // 不写入深度缓冲
+            transparent: true,  // 启用透明
+            vertexColors: true  // 使用顶点颜色
+        });
+
+        scene.add(new THREE.Points(starGeometry, starMaterial));  // 将星星添加到场景
+    }
+
+    // 创建星星纹理
+    function createStarTexture() {
+        const size = 64;  // 纹理大小
+        const canvas = document.createElement('canvas');  // 创建画布
+        canvas.width = size;  // 设置宽度
+        canvas.height = size;  // 设置高度
+        const context = canvas.getContext('2d');  // 获取2D上下文
+
+        // 创建径向渐变
+        const gradient = context.createRadialGradient(
+            size / 2, size / 2, 0,  // 内圆中心点和半径
+            size / 2, size / 2, size / 2  // 外圆中心点和半径
+        );
+        // 添加渐变颜色停止点
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');  // 中心点
+        gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');  // 20%处
+        gradient.addColorStop(0.5, 'rgba(255,255,255,0.3)');  // 50%处
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');  // 边缘
+
+        context.fillStyle = gradient;  // 设置填充样式
+        context.fillRect(0, 0, size, size);  // 填充矩形
+
+        return new THREE.CanvasTexture(canvas);  // 返回纹理
+    }
+
+    // 设置粒子系统
+    function setupParticleSystem() {
+        // 生成所有形状的粒子位置
+        targetPositions = SHAPES.map(shape => shape.generator(CONFIG.particleCount, CONFIG.shapeSize));
+        particlesGeometry = new THREE.BufferGeometry();  // 创建粒子几何体
+
+        // 初始化位置数组
+        currentPositions = new Float32Array(targetPositions[0]);
+        sourcePositions = new Float32Array(targetPositions[0]);
+        swarmPositions = new Float32Array(CONFIG.particleCount * 3);
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(currentPositions, 3));
+
+        // 初始化粒子属性数组
+        particleSizes = new Float32Array(CONFIG.particleCount);
+        particleOpacities = new Float32Array(CONFIG.particleCount);
+        particleEffectStrengths = new Float32Array(CONFIG.particleCount);
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+            particleSizes[i] = THREE.MathUtils.randFloat(CONFIG.particleSizeRange[0], CONFIG.particleSizeRange[1]);  // 随机粒子大小
+            particleOpacities[i] = 1.0;  // 设置不透明度
+            particleEffectStrengths[i] = 0.0;  // 设置效果强度
+        }
+        particlesGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+        particlesGeometry.setAttribute('opacity', new THREE.BufferAttribute(particleOpacities, 1));
+        particlesGeometry.setAttribute('aEffectStrength', new THREE.BufferAttribute(particleEffectStrengths, 1));
+
+        // 初始化颜色数组
+        const colors = new Float32Array(CONFIG.particleCount * 3);
+        updateColorArray(colors, currentPositions);
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        // 创建粒子材质
+        particlesMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                pointTexture: { value: createStarTexture() }  // 粒子纹理
+            },
+            vertexShader: `
+                attribute float size;  // 粒子大小
+                attribute float opacity;  // 不透明度
+                attribute float aEffectStrength;  // 效果强度
+                varying vec3 vColor;  // 传递到片元着色器的颜色
+                varying float vOpacity;  // 传递到片元着色器的不透明度
+                varying float vEffectStrength;  // 传递到片元着色器的效果强度
+
+                void main() {
+                    vColor = color;  // 传递颜色
+                    vOpacity = opacity;  // 传递不透明度
+                    vEffectStrength = aEffectStrength;  // 传递效果强度
+
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);  // 计算模型视图位置
+
+                    float sizeScale = 1.0 - vEffectStrength * ${CONFIG.morphSizeFactor.toFixed(2)};  // 计算大小缩放
+                    gl_PointSize = size * sizeScale * (400.0 / -mvPosition.z);  // 设置点大小
+
+                    gl_Position = projectionMatrix * mvPosition;  // 设置最终位置
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D pointTexture;  // 粒子纹理
+                varying vec3 vColor;  // 从顶点着色器接收的颜色
+                varying float vOpacity;  // 从顶点着色器接收的不透明度
+                varying float vEffectStrength;  // 从顶点着色器接收的效果强度
+
+                void main() {
+                    float alpha = texture2D(pointTexture, gl_PointCoord).a;  // 获取纹理透明度
+                    if (alpha < 0.05) discard;  // 如果太透明则丢弃
+
+                    vec3 finalColor = vColor * (1.0 + vEffectStrength * ${CONFIG.morphBrightnessFactor.toFixed(2)});  // 计算最终颜色
+
+                    gl_FragColor = vec4(finalColor, alpha * vOpacity);  // 设置最终颜色
+                }
+            `,
+            blending: THREE.AdditiveBlending,  // 使用加法混合
+            depthTest: true,  // 启用深度测试
+            depthWrite: false,  // 不写入深度缓冲
+            transparent: true,  // 启用透明
+            vertexColors: true  // 使用顶点颜色
+        });
+
+        particleSystem = new THREE.Points(particlesGeometry, particlesMaterial);  // 创建粒子系统
+        scene.add(particleSystem);  // 将粒子系统添加到场景
+    }
+
+    // 更新颜色数组
+    function updateColorArray(colors, positionsArray) {
+        const colorScheme = COLOR_SCHEMES[CONFIG.colorScheme];  // 获取当前颜色方案
+        const center = new THREE.Vector3(0, 0, 0);  // 中心点
+        const maxRadius = CONFIG.shapeSize * 1.1;  // 最大半径
+
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+            const i3 = i * 3;
+            tempVec.fromArray(positionsArray, i3);  // 获取粒子位置
+            const dist = tempVec.distanceTo(center);  // 计算到中心的距离
+            let hue;
+
+            if (CONFIG.colorScheme === 'rainbow') {  // 彩虹色系
+                const normX = (tempVec.x / maxRadius + 1) / 2;
+                const normY = (tempVec.y / maxRadius + 1) / 2;
+                const normZ = (tempVec.z / maxRadius + 1) / 2;
+                hue = (normX * 120 + normY * 120 + normZ * 120) % 360;
+            } else {  // 其他色系
+                hue = THREE.MathUtils.mapLinear(dist, 0, maxRadius, colorScheme.startHue, colorScheme.endHue);
+            }
+
+            // 添加噪声变化
+            const noiseValue = (noise3D(tempVec.x * 0.2, tempVec.y * 0.2, tempVec.z * 0.2) + 1) * 0.5;
+            const saturation = THREE.MathUtils.clamp(colorScheme.saturation * (0.9 + noiseValue * 0.2), 0, 1);
+            const lightness = THREE.MathUtils.clamp(colorScheme.lightness * (0.85 + noiseValue * 0.3), 0.1, 0.9);
+
+            const color = new THREE.Color().setHSL(hue / 360, saturation, lightness);  // 创建颜色
+            color.toArray(colors, i3);  // 存储颜色
+        }
+    }
+
+    // 更新颜色
+    function updateColors() {
+        const colors = particlesGeometry.attributes.color.array;  // 获取颜色数组
+        updateColorArray(colors, particlesGeometry.attributes.position.array);  // 更新颜色
+        particlesGeometry.attributes.color.needsUpdate = true;  // 标记需要更新
+    }
+
+    // 触发变形动画
+    function triggerMorph() {
+        if (isMorphing) return;  // 如果正在变形则返回
+        isMorphing = true;  // 设置变形状态
+        controls.autoRotate = false;  // 停止自动旋转
+        console.log("Morphing triggered...");  // 输出日志
+
+        // 更新UI
+        document.getElementById('info').innerText = `Morphing...`;
+        document.getElementById('info').style.textShadow = '0 0 8px rgba(255, 150, 50, 0.9)';
+
+        // 保存当前位置
+        sourcePositions.set(currentPositions);
+        const nextShapeIndex = (currentShapeIndex + 1) % SHAPES.length;  // 计算下一个形状索引
+        const nextTargetPositions = targetPositions[nextShapeIndex];  // 获取下一个目标位置
+
+        // 计算群集位置
+        const centerOffsetAmount = CONFIG.shapeSize * CONFIG.swarmDistanceFactor;
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+            const i3 = i * 3;
+            sourceVec.fromArray(sourcePositions, i3);
+            targetVec.fromArray(nextTargetPositions, i3);
+            swarmVec.lerpVectors(sourceVec, targetVec, 0.5);  // 计算中间位置
+
+            // 添加随机偏移
+            const offsetDir = tempVec.set(
+                noise3D(i * 0.05, 10, 10),
+                noise3D(20, i * 0.05, 20),
+                noise3D(30, 30, i * 0.05)
+            ).normalize();
+            const distFactor = sourceVec.distanceTo(targetVec) * 0.1 + centerOffsetAmount;
+            swarmVec.addScaledVector(offsetDir, distFactor * (0.5 + Math.random() * 0.8));
+            swarmPositions[i3] = swarmVec.x;
+            swarmPositions[i3 + 1] = swarmVec.y;
+            swarmPositions[i3 + 2] = swarmVec.z;
+        }
+
+        currentShapeIndex = nextShapeIndex;  // 更新当前形状索引
+        morphState.progress = 0;  // 重置变形进度
+
+        // 创建变形动画
+        if (morphTimeline) morphTimeline.pause();
+        morphTimeline = anime({
+            targets: morphState,
+            progress: 1,
+            duration: CONFIG.morphDuration,
+            easing: 'cubicBezier(0.4, 0.0, 0.2, 1.0)',
+            complete: () => {
+                console.log("Morphing complete.");  // 输出完成日志
+                document.getElementById('info').innerText = `Shape: ${SHAPES[currentShapeIndex].name} (Click to morph)`;
+                document.getElementById('info').style.textShadow = '0 0 5px rgba(0, 128, 255, 0.8)';
+                currentPositions.set(targetPositions[currentShapeIndex]);  // 更新当前位置
+                particlesGeometry.attributes.position.needsUpdate = true;  // 标记需要更新
+                particleEffectStrengths.fill(0.0);  // 重置效果强度
+                particlesGeometry.attributes.aEffectStrength.needsUpdate = true;  // 标记需要更新
+                sourcePositions.set(targetPositions[currentShapeIndex]);  // 更新源位置
+                updateColors();  // 更新颜色
+                isMorphing = false;  // 重置变形状态
+                controls.autoRotate = true;  // 恢复自动旋转
+            }
+        });
+    }
+
+    // 动画循环
+    function animate() {
+        requestAnimationFrame(animate);  // 请求下一帧
+        if (!isInitialized) return;  // 如果未初始化则返回
+
+        const elapsedTime = clock.getElapsedTime();  // 获取经过时间
+        const deltaTime = clock.getDelta();  // 获取时间增量
+        controls.update();  // 更新控制器
+
+        const positions = particlesGeometry.attributes.position.array;  // 获取位置数组
+        const effectStrengths = particlesGeometry.attributes.aEffectStrength.array;  // 获取效果强度数组
+
+        if (isMorphing) {  // 如果正在变形
+            updateMorphAnimation(positions, effectStrengths, elapsedTime, deltaTime);  // 更新变形动画
+        } else {  // 如果不在变形
+            updateIdleAnimation(positions, effectStrengths, elapsedTime, deltaTime);  // 更新空闲动画
+        }
+
+        particlesGeometry.attributes.position.needsUpdate = true;  // 标记位置需要更新
+        if (isMorphing || particlesGeometry.attributes.aEffectStrength.needsUpdate) {
+            particlesGeometry.attributes.aEffectStrength.needsUpdate = true;  // 标记效果强度需要更新
+        }
+
+        composer.render(deltaTime);  // 渲染场景
+    }
+
+    // updateMorphAnimation: 负责在形状变形过程中更新粒子位置和效果
+    // 参数: positions(粒子位置数组), effectStrengths(效果强度数组), elapsedTime(已经过时间), deltaTime(帧时间增量)
+    function updateMorphAnimation(positions, effectStrengths, elapsedTime, deltaTime) {
+        // 获取当前变形进度(0到1之间)
+        const t = morphState.progress;
+
+        // 获取当前目标形状的所有粒子位置
+        const targets = targetPositions[currentShapeIndex];
+
+        // 计算效果强度 - 使用正弦波形让变形中间过程(t=0.5)效果最强
+        // Math.sin(t*Math.PI)在t=0和t=1时为0,在t=0.5时为1,形成平滑的增强后减弱效果
+        const effectStrength = Math.sin(t * Math.PI);
+
+        // 计算当前旋转强度 - 结合效果强度、配置的旋转因子和时间增量
+        // 乘以50是为了放大效果,使旋转更明显
+        const currentSwirl = effectStrength * CONFIG.swirlFactor * deltaTime * 50;
+
+        // 计算噪声强度 - 随变形进度变化,在变形中间过程最强
+        const currentNoise = effectStrength * CONFIG.noiseMaxStrength;
+
+        // 遍历所有粒子进行更新
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+            const i3 = i * 3; // 计算在数组中的起始索引(每个粒子有x,y,z三个值)
+
+            // 获取粒子的起始位置、群集位置和目标位置
+            sourceVec.fromArray(sourcePositions, i3);
+            swarmVec.fromArray(swarmPositions, i3);
+            targetVec.fromArray(targets, i3);
+
+            // 使用二次贝塞尔曲线计算当前位置
+            // 公式: P = (1-t)² * P₀ + 2(1-t)t * P₁ + t² * P₂
+            // 其中P₀是起始位置,P₁是中间控制点(群集位置),P₂是目标位置
+            const t_inv = 1.0 - t;
+            const t_inv_sq = t_inv * t_inv;
+            const t_sq = t * t;
+            bezPos.copy(sourceVec).multiplyScalar(t_inv_sq);
+            bezPos.addScaledVector(swarmVec, 2.0 * t_inv * t);
+            bezPos.addScaledVector(targetVec, t_sq);
+
+            // 添加旋转效果 - 当旋转强度足够大时
+            if (currentSwirl > 0.01) {
+                // 计算粒子相对于起始位置的位移向量
+                tempVec.subVectors(bezPos, sourceVec);
+
+                // 使用噪声生成旋转轴,使每个粒子有不同的旋转方向
+                swirlAxis.set(
+                    noise3D(i * 0.02, elapsedTime * 0.1, 0),
+                    noise3D(0, i * 0.02, elapsedTime * 0.1 + 5),
+                    noise3D(elapsedTime * 0.1 + 10, 0, i * 0.02)
+                ).normalize();
+
+                // 绕计算出的轴旋转位移向量,旋转角度由currentSwirl决定
+                // 加入随机因子(0.5+random*0.5)使旋转更自然
+                tempVec.applyAxisAngle(swirlAxis, currentSwirl * (0.5 + Math.random() * 0.5));
+
+                // 重新计算位置
+                bezPos.copy(sourceVec).add(tempVec);
+            }
+
+            // 添加噪声效果 - 当噪声强度足够大时
+            if (currentNoise > 0.01) {
+                // 计算当前噪声时间
+                const noiseTime = elapsedTime * CONFIG.noiseTimeScale;
+
+                // 使用4D噪声(3D空间+时间)计算噪声偏移量
+                // 为每个维度使用不同偏移值(+100,+200)确保不同维度的噪声是独立的
+                noiseOffset.set(
+                    noise4D(bezPos.x * CONFIG.noiseFrequency, bezPos.y * CONFIG.noiseFrequency, bezPos.z * CONFIG.noiseFrequency, noiseTime),
+                    noise4D(bezPos.x * CONFIG.noiseFrequency + 100, bezPos.y * CONFIG.noiseFrequency + 100, bezPos.z * CONFIG.noiseFrequency + 100, noiseTime),
+                    noise4D(bezPos.x * CONFIG.noiseFrequency + 200, bezPos.y * CONFIG.noiseFrequency + 200, bezPos.z * CONFIG.noiseFrequency + 200, noiseTime)
+                );
+
+                // 将噪声偏移应用到位置上,偏移量由currentNoise控制
+                bezPos.addScaledVector(noiseOffset, currentNoise);
+            }
+
+            // 更新粒子位置数组
+            positions[i3] = bezPos.x;
+            positions[i3 + 1] = bezPos.y;
+            positions[i3 + 2] = bezPos.z;
+
+            // 更新效果强度 - 用于着色器中控制粒子大小和亮度
+            effectStrengths[i] = effectStrength;
+        }
+
+        // 标记效果强度属性需要更新
+        particlesGeometry.attributes.aEffectStrength.needsUpdate = true;
+    }
+
+    // updateIdleAnimation: 负责在形状静止时产生细微的动画效果
+    // 参数: positions(粒子位置数组), effectStrengths(效果强度数组), elapsedTime(已经过时间), deltaTime(帧时间增量)
+    function updateIdleAnimation(positions, effectStrengths, elapsedTime, deltaTime) {
+        // 计算呼吸效果的缩放系数 - 通过正弦波使形状略微膨胀和收缩
+        // 1.0为基准大小,加减0.015形成±1.5%的大小变化
+        const breathScale = 1.0 + Math.sin(elapsedTime * 0.5) * 0.015;
+
+        // 计算流动效果的时间因子,使噪声随时间变化
+        const timeScaled = elapsedTime * CONFIG.idleFlowSpeed;
+
+        // 噪声频率 - 控制噪声变化的空间尺度
+        const freq = 0.1;
+
+        // 标记是否需要重置效果强度
+        let needsEffectStrengthReset = false;
+
+        // 遍历所有粒子
+        for (let i = 0; i < CONFIG.particleCount; i++) {
+            const i3 = i * 3; // 计算在数组中的起始索引
+
+            // 获取粒子的原始位置(形状定义的位置)
+            sourceVec.fromArray(sourcePositions, i3);
+
+            // 应用呼吸缩放效果
+            tempVec.copy(sourceVec).multiplyScalar(breathScale);
+
+            // 使用4D噪声(3D空间+时间)计算流动向量
+            // 为每个维度使用不同偏移值(+10,+20)确保噪声的独立性
+            flowVec.set(
+                noise4D(tempVec.x * freq, tempVec.y * freq, tempVec.z * freq, timeScaled),
+                noise4D(tempVec.x * freq + 10, tempVec.y * freq + 10, tempVec.z * freq + 10, timeScaled),
+                noise4D(tempVec.x * freq + 20, tempVec.y * freq + 20, tempVec.z * freq + 20, timeScaled)
+            );
+
+            // 应用流动效果,使粒子位置随噪声轻微偏移
+            tempVec.addScaledVector(flowVec, CONFIG.idleFlowStrength);
+
+            // 获取粒子当前位置
+            currentVec.fromArray(positions, i3);
+
+            // 平滑过渡到新位置 - 使用线性插值避免突变
+            // 系数0.05表示每帧移动约5%的距离,产生缓动效果
+            currentVec.lerp(tempVec, 0.05);
+
+            // 更新粒子位置数组
+            positions[i3] = currentVec.x;
+            positions[i3 + 1] = currentVec.y;
+            positions[i3 + 2] = currentVec.z;
+
+            // 重置效果强度为0(静止状态不需要特殊效果)
+            if (effectStrengths[i] !== 0.0) {
+                effectStrengths[i] = 0.0;
+                needsEffectStrengthReset = true;
+            }
+        }
+
+        // 如果有效果强度被修改,标记需要更新
+        if (needsEffectStrengthReset) {
+            particlesGeometry.attributes.aEffectStrength.needsUpdate = true;
+        }
+    }
+
+    // 画布点击事件处理
+    function onCanvasClick(event) {
+        if (event.target.closest('#controls')) { return; }  // 如果点击的是控制面板则返回
+        triggerMorph();  // 触发变形
+    }
+
+    // 窗口大小改变事件处理
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;  // 更新相机宽高比
+        camera.updateProjectionMatrix();  // 更新相机投影矩阵
+        renderer.setSize(window.innerWidth, window.innerHeight);  // 更新渲染器大小
+        composer.setSize(window.innerWidth, window.innerHeight);  // 更新后期处理大小
+    }
+
+    init();  // 初始化场景
+
+</script>
