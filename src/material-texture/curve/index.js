@@ -68,7 +68,7 @@ const bezierLine = new THREE.Line(bezierGeometry, bezierMaterial)
 const geometry3 = new THREE.BufferGeometry()
 geometry3.setFromPoints([v1, v2, v3])
 const material3 = new THREE.PointsMaterial({
-    color: new THREE.Color('greeen'),
+    color: new THREE.Color('green'),
     size: 10,
 })
 const point2 = new THREE.Points(geometry3, material3)

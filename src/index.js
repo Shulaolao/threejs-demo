@@ -5,7 +5,7 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
 // import mesh from './material-texture/wall/index.js'
 // import mesh from './material-texture/muxing/index.js'
 import { curve, splineLine, bezierLine, bezier3Line, compositeLine } from './material-texture/curve/index.js'
-import { catMullRomMesh, LatheMesh, shapeMesh, tubeMesh, tubePoints } from './generate-geometry/index.js';
+import { catMullRomMesh, cylinderMesh, LatheMesh, shapeMesh, tubeMesh, tubePoints } from './generate-geometry/index.js';
 
 const scene = new THREE.Scene();
 
@@ -14,11 +14,12 @@ const gui = new GUI();
 const width = window.innerWidth
 const height = window.innerHeight
 
-scene.add(catMullRomMesh);
+scene.add(cylinderMesh);
 
 const camera = new THREE.PerspectiveCamera(60, width / height, 1, 1000000);
 // camera.position.set(90, 230, 1175);
-camera.position.set(0, 0, 200);
+// camera.position.set(0, 0, 200);
+camera.position.set(0.9, -520, 6.5);
 camera.lookAt(0, 0, 0);
 
 // const pointLight = new THREE.PointLight(0xffffff, 10000);
@@ -41,15 +42,28 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(width, height);
 
 let i = 0
+const clock = new THREE.Clock();
+let H = 0
 function render() {
     // mesh.material.map.offset.x += 0.001;
-    if (i < tubePoints.length - 1) {
-        camera.position.copy(tubePoints[i])
-        camera.lookAt(tubePoints[i + 1])
-        // i++
-    } else {
-        i = 0
+    // if (i < tubePoints.length - 1) {
+    //     camera.position.copy(tubePoints[i])
+    //     camera.lookAt(tubePoints[i + 1])
+    //     // i++
+    // } else {
+    //     i = 0
+    // }
+    // cylinderMesh.material.map.offset.y += 0.01;
+
+    H += 0.002
+    if (H > 1) {
+        H = 0
     }
+    // setHSL 色相 饱和度 亮度
+    cylinderMesh.material.color.setHSL(H, 0.5, 0.5);
+    const delta = clock.getDelta();
+    cylinderMesh.material.alphaMap.offset.y += delta * 0.5
+    cylinderMesh.rotation.y += delta * 0.5; // 加上旋转动画
     renderer.render(scene, camera);
     requestAnimationFrame(render);
 }
@@ -74,4 +88,8 @@ document.addEventListener('keydown', (e) => {
     } else if (e.code === 'ArrowUp') {
         i--
     }
+})
+
+document.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
 })

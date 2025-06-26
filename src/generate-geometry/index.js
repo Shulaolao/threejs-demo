@@ -90,10 +90,25 @@ const catMullRomMaterial = new THREE.MeshLambertMaterial({
 const catMullRomMesh = new THREE.Mesh(catMullRomGeometry, catMullRomMaterial)
 const tubePoints = catMullRomPath.getPoints(1000)
 
+// CylinderGeometry 圆柱体 顶部、底部半径 高度 横截面分段 竖截面分段 圆扇区是否开口 分段起始角度 底面中心角
+const cylinderGeometry = new THREE.CylinderGeometry(30, 50, 1000, 32, 32, true)
+const cylinderTexture = new THREE.TextureLoader().load('/src/generate-geometry/storm.jpg')
+cylinderTexture.wrapS = THREE.RepeatWrapping
+cylinderTexture.wrapT = THREE.RepeatWrapping
+cylinderTexture.colorSpace = THREE.SRGBColorSpace
+cylinderTexture.repeat.set(1, 2)
+const cylinderMaterial = new THREE.MeshBasicMaterial({
+    transparent: true,
+    alphaMap: cylinderTexture, // 一张灰度纹理，用于控制整个表面的不透明度。（黑色：完全透明；白色：完全不透明）
+    side: THREE.BackSide,
+})
+const cylinderMesh = new THREE.Mesh(cylinderGeometry, cylinderMaterial)
+
 export {
     LatheMesh,
     tubeMesh,
     shapeMesh,
     catMullRomMesh,
     tubePoints,
+    cylinderMesh,
 }

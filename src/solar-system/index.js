@@ -97,4 +97,10 @@ const centerBallLite = new THREE.Sprite(new THREE.SpriteMaterial({
     blending: THREE.AdditiveBlending
 }));
 centerBallLite.scale.x = centerBallLite.scale.y = centerBallLite.scale.z = 1;
-// scene.add(centerBallLite);
+scene.add(centerBallLite);
+
+window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+})
