@@ -21,6 +21,7 @@ const width = window.innerWidth
 const height = window.innerHeight
 
 scene.add(house);
+console.log(scene.getObjectByName('step'))
 
 const camera = new THREE.PerspectiveCamera(60, width / height, 1, 1000000);
 // camera.position.set(90, 230, 1175);
@@ -100,6 +101,8 @@ document.addEventListener('keydown', (e) => {
     }
 })
 
-document.addEventListener('resize', () => {
+window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
 })

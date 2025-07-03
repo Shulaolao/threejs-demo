@@ -20,9 +20,20 @@ export const generatePlanet = (name) => {
     texture.wrapS = THREE.RepeatWrapping // 水平
     texture.wrapT = THREE.RepeatWrapping // 竖直
     const geometry = new THREE.SphereGeometry(planetInfo.radius * radiuszoom)
-    const material = new THREE.MeshBasicMaterial({
+    // const material = new THREE.MeshBasicMaterial({
+    //     map: texture,
+    // })
+    let material = new THREE.MeshStandardMaterial({
         map: texture,
     })
+    if(name === 'earth') {
+        material = new THREE.MeshStandardMaterial({
+            map: loader.load(`/src/solar-system/images/${planetInfo.day_map}`),
+            bumpScale: 0.8, // 微小起伏避免背面过亮
+            roughness: 0.8, // 陆地粗糙度
+            metalness: 0.2, // 海洋部分反射
+        })
+    }
     const mesh = new THREE.Mesh(geometry, material)
 
     mesh.position.set(revoluteRadUint * au, 0, 0)

@@ -16,6 +16,8 @@ export const planets = {
         eccentricity: 0.017, // 轨道偏心率
         inclination: 0, // 轨道倾斜角
         map: 'earth_specular.tif',
+        day_map: 'earth_day.jpg',
+        night_map: 'earth_night.jpg',
         revolutionSpeed: 1, // 公转速度
     },
     // 水星

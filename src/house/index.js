@@ -166,13 +166,13 @@ texture.wrapT = THREE.RepeatWrapping;
 texture.repeat.x = 20;
 texture.repeat.y = 20;
 
-const geometry = new THREE.PlaneGeometry(100000, 100000);
-const material = new THREE.MeshLambertMaterial({
+const grassGeometry = new THREE.PlaneGeometry(100000, 100000);
+const grassMaterial = new THREE.MeshLambertMaterial({
     // color: new THREE.Color('green'),
     map: texture,
     aoMap: texture
 });
-const grass = new THREE.Mesh(geometry, material);
+const grass = new THREE.Mesh(grassGeometry, grassMaterial);
 grass.rotateX( -Math.PI / 2);
 grass.position.y = -150;
 
@@ -186,5 +186,14 @@ house.add(stepMesh)
 house.add(roofMesh)
 house.add(roofMesh2)
 house.add(grass)
+
+const pos = new THREE.Vector3()
+stepMesh.getWorldPosition(pos)
+console.log(pos)
+console.log(house.position)
+console.log(stepMesh.position)
+house.traverse((obj) => { // 遍历group 的所有对象
+})
+stepMesh.name = 'step'
 
 export default house
