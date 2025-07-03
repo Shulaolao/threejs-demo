@@ -6,20 +6,27 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js'
 // import mesh from './material-texture/muxing/index.js'
 import { curve, splineLine, bezierLine, bezier3Line, compositeLine } from './material-texture/curve/index.js'
 import { catMullRomMesh, cylinderMesh, LatheMesh, shapeMesh, tubeMesh, tubePoints } from './generate-geometry/index.js';
+import house from './house/index.js';
 
 const scene = new THREE.Scene();
-
 const gui = new GUI();
+
+scene.fog = new THREE.Fog( 0xcccccc, 1000, 40000);
+
+const fogControl = gui.addFolder('雾');
+fogControl.add(scene.fog, 'near').step(100);
+fogControl.add(scene.fog, 'far').step(1000);
 
 const width = window.innerWidth
 const height = window.innerHeight
 
-scene.add(cylinderMesh);
+scene.add(house);
 
 const camera = new THREE.PerspectiveCamera(60, width / height, 1, 1000000);
 // camera.position.set(90, 230, 1175);
 // camera.position.set(0, 0, 200);
-camera.position.set(0.9, -520, 6.5);
+// camera.position.set(0.9, -520, 6.5);
+camera.position.set(3000, 3000, 3000)
 camera.lookAt(0, 0, 0);
 
 // const pointLight = new THREE.PointLight(0xffffff, 10000);
@@ -28,18 +35,21 @@ camera.lookAt(0, 0, 0);
 
 // 平行光可以投射阴影
 const directionLight = new THREE.DirectionalLight(0xffffff)
-directionLight.position.set(100, 100, 100)
+directionLight.position.set(3000, 3000, 3000)
 scene.add(directionLight)
 
 // 环境光会均匀的照亮场景中的所有物体
 const ambientLight = new THREE.AmbientLight()
 scene.add(ambientLight)
 
-const axesHelper = new THREE.AxesHelper(500);
-// scene.add(axesHelper);
+const axesHelper = new THREE.AxesHelper(5000);
+scene.add(axesHelper);
 
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({
+    logarithmicDepthBuffer: true,
+});
 renderer.setSize(width, height);
+renderer.setClearColor(new THREE.Color('skyblue'));
 
 let i = 0
 const clock = new THREE.Clock();
@@ -60,10 +70,10 @@ function render() {
         H = 0
     }
     // setHSL 色相 饱和度 亮度
-    cylinderMesh.material.color.setHSL(H, 0.5, 0.5);
-    const delta = clock.getDelta();
-    cylinderMesh.material.alphaMap.offset.y += delta * 0.5
-    cylinderMesh.rotation.y += delta * 0.5; // 加上旋转动画
+    // cylinderMesh.material.color.setHSL(H, 0.5, 0.5);
+    // const delta = clock.getDelta();
+    // cylinderMesh.material.alphaMap.offset.y += delta * 0.5
+    // cylinderMesh.rotation.y += delta * 0.5; // 加上旋转动画
     renderer.render(scene, camera);
     requestAnimationFrame(render);
 }

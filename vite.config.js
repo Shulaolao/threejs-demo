@@ -17,7 +17,7 @@ export default defineConfig({
     resolve: {
         alias: {
             // Set up aliases for easier imports
-            '@': resolve(__dirname, 'src'),
+            '@': resolve(__dirname, './src'),
             'three/addons': resolve(__dirname, 'node_modules/three/examples/jsm'),
         },
     },
