@@ -11,6 +11,7 @@ export default defineConfig({
         port: 3000,
         open: true, // Auto-open browser on server start
         cors: true, // Enable CORS
+        allowedHosts: ['60c1-120-85-100-161.ngrok-free.app'], // 允许响应的主机名，为true 时将允许任何网站向你的服务器发起请求
     },
 
     // Resolve configuration
